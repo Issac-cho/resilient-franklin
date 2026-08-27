@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>대답 확인 중...</title>
+    <style>
+        /* 기본 리셋 및 배경 */
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: #050505; 
+            background-image: url('./background.png');
+            background-size: cover;
+            background-position: center;
+            color: #fff; font-family: 'Pretendard', -apple-system, sans-serif; overflow: hidden; perspective: 1000px; 
+        }
+        
+        /* 뷰 (화면) 공통 */
+        #home-view, #effect-view { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; position: absolute; top: 0; left: 0; }
+        
+        #home-view.active, #effect-view.active { display: flex; }
+
+        /* --- Home View --- */
+        .input-container { background: #1a1a1a; padding: 40px; border-radius: 20px; text-align: center; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 10;}
+        h2 { margin-top: 0; color: #eee; }
+        p { color: #aaa; margin-bottom: 25px; }
+        input[type="text"] { padding: 15px; font-size: 20px; width: 80%; max-width: 300px; border-radius: 8px; border: 2px solid #444; background: #000; color: #fff; outline: none; margin-bottom: 20px; transition: border-color 0.3s; text-align: center;}
+        input[type="text"]:focus { border-color: #FFD700; }
+        button.action-btn { padding: 15px 30px; font-size: 18px; border: none; border-radius: 8px; background: #FFD700; color: #000; cursor: pointer; font-weight: bold; transition: background 0.3s, transform 0.1s; }
+        button.action-btn:hover { background: #FACC15; }
+        button.action-btn:active { transform: scale(0.95); }
+        #link-result { margin-top: 25px; padding: 15px; background: #2a2000; border: 1px solid #FFD700; border-radius: 8px; word-break: break-all; color: #FFD700; display: none; cursor: pointer; font-size: 14px; transition: background 0.3s; }
+        #link-result:hover { background: #3a3000; }
+        
+        /* --- Effect View --- */
+        
+        /* 1. 무대와 핀포인트 조명 */
+        .stage-container { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; z-index: 10; transition: opacity 0.5s; }
+        
+        .spotlight {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 50vw;
+            max-width: 800px;
+            height: 100vh;
+            /* 위에서 아래로 퍼지는 뚜렷한 빛기둥 */
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.15) 70%, transparent 100%);
+            clip-path: polygon(40% 0, 60% 0, 100% 100%, 0% 100%);
+            transform: translateX(-50%);
+            transform-origin: top center;
+            animation: spotlightSway 4s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 25; /* 빛이 상자를 살짝 덮게 */
+        }
+        @keyframes spotlightSway {
+            0% { transform: translateX(-50%) rotate(-3deg); }
+            100% { transform: translateX(-50%) rotate(3deg); }
+        }
+
+        .bg-fade {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000;
+            opacity: 0;
+            z-index: 1;
+            transition: opacity 3s ease-in-out;
+            pointer-events: none;
+        }
+        .bg-fade.active { opacity: 1; }
+
+        .floor {
+            position: absolute;
+            bottom: 20%;
+            width: 50vw;
+            max-width: 500px;
+            height: 100px;
+            /* 입체적인 단상 (무대) */
+            background: #2a2a2a;
+            border-radius: 50%;
+            box-shadow: 
+                0 20px 0 #111, /* 단상 두께 */
+                0 40px 50px rgba(0,0,0,0.9), /* 그림자 */
+                inset 0 10px 30px rgba(255,255,255,0.3); /* 조명 반사 */
+            z-index: 5;
+        }
+
+        /* 2. 사용자가 직접 그린 보물상자 */
+        #gift-box { 
+            width: clamp(300px, 50vw, 700px); 
+            height: clamp(300px, 50vw, 700px); 
+            background-image: url('./box.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            position: relative;
+            z-index: 20;
+            margin-bottom: 80px; /* 단상 위에 얹혀 있도록 위치 조정 */
+            animation: floatAndShake 2.5s infinite;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.6s;
+            /* 배경색에 따라 아래 속성 활성/비활성 결정 */
+            /* mix-blend-mode: screen; */ 
+        }
+        
+        @keyframes floatAndShake {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            20% { transform: translateY(-10px) rotate(5deg); }
+            40% { transform: translateY(-10px) rotate(-5deg); }
+            60% { transform: translateY(-20px) rotate(5deg); }
+            80% { transform: translateY(-20px) rotate(-5deg); }
+        }
+
+        .gift-explode { 
+            transform: scale(4) translateY(-50px) !important; 
+            opacity: 0; 
+            filter: blur(20px) !important; 
+        }
+
+        /* 시네마틱 텍스트 */
+        .cinematic-text { font-size: clamp(2rem, 6vw, 4rem); font-weight: 200; opacity: 0; position: absolute; text-align: center; transition: opacity 2s ease-in-out; letter-spacing: 5px; z-index: 20;}
+        
+        /* 3. 화려한 네온사인 (텍스트 주변) */
+        .neon-border {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90vw;
+            max-width: 900px;
+            height: 60vh;
+            border: 8px solid #fff;
+            border-radius: 30px;
+            opacity: 0;
+            z-index: 25;
+            pointer-events: none;
+            box-sizing: border-box;
+            transition: opacity 1s;
+        }
+        
+        .neon-border.active {
+            opacity: 1;
+            /* 고장난 듯 켜졌다 꺼졌다 하는 사이버펑크 네온 효과 */
+            animation: neonFlicker 2s infinite;
+        }
+
+        @keyframes neonFlicker {
+            0%, 18%, 22%, 25%, 53%, 57%, 100% {
+                box-shadow: 
+                    0 0 20px #fff, inset 0 0 20px #fff, 
+                    0 0 40px #ff00ff, inset 0 0 40px #ff00ff, 
+                    0 0 80px #ff00ff, inset 0 0 80px #ff00ff;
+                border-color: #fff;
+            }
+            20%, 24%, 55% {
+                box-shadow: none;
+                border-color: #333;
+            }
+        }
+
+        /* 4. 최종 텍스트 (공중제비 회전 + 금빛 폭발) */
+        .reveal-text { 
+            font-size: clamp(6rem, 30vw, 20rem); 
+            font-weight: 900; 
+            opacity: 0; 
+            color: #FFF; 
+            text-shadow: 
+                0 0 15px #FFF,
+                0 0 30px #FFD700, 
+                0 0 50px #FFD700, 
+                0 0 90px #FFA500, 
+                0 0 140px #FF8C00,
+                0 0 200px #FF0000; 
+            word-break: keep-all; 
+            text-align: center; 
+            padding: 20px;
+            z-index: 30;
+            transform-style: preserve-3d;
+        }
+        
+        @keyframes dramaticReveal {
+            /* 2바퀴(720도) 공중제비를 돌며 저 멀리서 다가옴 */
+            0% { opacity: 0; transform: scale(0.1) rotateZ(720deg) rotateY(720deg) translateY(100px); filter: blur(30px); }
+            /* 다가오면서 관성에 의해 약간 오버 스케일 됨 */
+            60% { opacity: 1; transform: scale(1.3) rotateZ(-15deg) rotateY(-15deg) translateY(-20px); filter: blur(0px); }
+            /* 제자리에 무겁게 안착 */
+            100% { opacity: 1; transform: scale(1) rotateZ(0deg) rotateY(0deg) translateY(0); }
+        }
+        .animate-reveal { animation: dramaticReveal 2.5s cubic-bezier(0.2, 1, 0.3, 1) forwards; }
+
+        /* 금빛 아우라 */
+        .gold-halo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 150vmax;
+            height: 150vmax;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(255,215,0,0.5) 0%, rgba(255,140,0,0.2) 30%, transparent 60%);
+            opacity: 0;
+            transition: opacity 2s;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .gold-halo.active {
+            opacity: 1;
+            animation: pulseGold 3s infinite alternate;
+        }
+        @keyframes pulseGold {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+            100% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+        }
+
+        /* 좌상단 숨겨진 Home 버튼 */
+        #home-btn { position: absolute; top: 15px; left: 15px; font-size: 12px; color: #666; background: none; border: none; cursor: pointer; display: none; z-index: 100; text-decoration: none; padding: 5px; }
+        #home-btn:hover { color: #fff; text-decoration: underline; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+
+    <div id="home-view">
+        <div class="input-container">
+            <h2>대답 생성기</h2>
+            <p>친구를 압도할 황금빛 대답을 입력하세요.</p>
+            <input type="text" id="message-input" placeholder="예: 응, 아니, 글쎄" autocomplete="off" />
+            <br>
+            <button class="action-btn" onclick="generateLink()">웅장한 링크 만들기</button>
+            <div id="link-result" onclick="copyLink()"></div>
+        </div>
+    </div>
+
+    <div id="effect-view">
+        <div id="bg-fade" class="bg-fade"></div>
+        <!-- 무대와 선물 상자 -->
+        <div id="stage" class="stage-container">
+            <div class="spotlight"></div>
+            <div class="floor"></div>
+            <div id="gift-box"></div>
+        </div>
+
+        <!-- 시네마틱 텍스트 -->
+        <div id="step1" class="cinematic-text">수많은 고민과 번뇌 끝에...</div>
+        <div id="step2" class="cinematic-text">마침내 내린 결론은...</div>
+        
+        <!-- 네온사인 및 후광 -->
+        <div id="neon-border" class="neon-border"></div>
+        <div id="gold-halo" class="gold-halo"></div>
+        
+        <!-- 최종 텍스트 -->
+        <div id="final-text" class="reveal-text"></div>
+    </div>
+
+    <button id="home-btn" onclick="goHome()">home</button>
+
+    <script>
+        const encodeMsg = (str) => btoa(encodeURIComponent(str));
+        const decodeMsg = (str) => decodeURIComponent(atob(str));
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const secretMsg = urlParams.get('q');
+
+        const homeView = document.getElementById('home-view');
+        const effectView = document.getElementById('effect-view');
+        const homeBtn = document.getElementById('home-btn');
+
+        if (secretMsg) {
+            effectView.classList.add('active');
+            setTimeout(startEffect, 500); 
+        } else {
+            homeView.classList.add('active');
+        }
+
+        function generateLink() {
+            const input = document.getElementById('message-input').value.trim();
+            if (!input) {
+                alert('대답을 입력해주세요!');
+                return;
+            }
+            const encoded = encodeMsg(input);
+            const link = `${window.location.origin}${window.location.pathname}?q=${encoded}`;
+            
+            const resultDiv = document.getElementById('link-result');
+            resultDiv.innerHTML = `<strong>링크가 생성되었습니다! (클릭하여 복사)</strong><br><br><span style="word-break: break-all;">${link}</span>`;
+            resultDiv.style.display = 'block';
+            resultDiv.dataset.link = link;
+        }
+
+        function copyLink() {
+            const resultDiv = document.getElementById('link-result');
+            const link = resultDiv.dataset.link;
+            navigator.clipboard.writeText(link).then(() => {
+                alert('복사 완료! 카톡으로 친구에게 보내세요.');
+            });
+        }
+
+        async function startEffect() {
+            // 1. 무대 위 상자 애니메이션
+            const giftBox = document.getElementById('gift-box');
+            const stage = document.getElementById('stage');
+            
+            await sleep(3000); // 핀포인트 조명 아래서 흔들림 감상
+            
+            // 상자 폭발하며 무대 전체 사라짐
+            giftBox.classList.add('gift-explode');
+            await sleep(600);
+            stage.style.opacity = 0;
+            await sleep(500);
+            stage.style.display = 'none';
+
+            // 2. 시네마틱 텍스트 1
+            const step1 = document.getElementById('step1');
+            step1.style.opacity = 1;
+            await sleep(2500);
+            step1.style.opacity = 0;
+            await sleep(1000);
+
+            // 3. 시네마틱 텍스트 2
+            const step2 = document.getElementById('step2');
+            step2.style.opacity = 1;
+            await sleep(2500);
+            step2.style.opacity = 0;
+            await sleep(1000);
+
+            // 4. 황금빛 네온사인 + 공중제비 텍스트 공개
+            fireGoldConfetti();
+            document.getElementById('gold-halo').classList.add('active');
+            document.getElementById('neon-border').classList.add('active');
+            document.getElementById('bg-fade').classList.add('active');
+            
+            const finalText = document.getElementById('final-text');
+            try {
+                finalText.innerText = decodeMsg(secretMsg);
+            } catch (e) {
+                finalText.innerText = "메시지 오류";
+            }
+            finalText.classList.add('animate-reveal');
+
+            // 홈 버튼 노출
+            setTimeout(() => {
+                homeBtn.style.display = 'block';
+            }, 3000);
+        }
+
+        function fireGoldConfetti() {
+            var defaults = { 
+                startVelocity: 30, 
+                spread: 360, 
+                ticks: 80, 
+                zIndex: 20,
+                colors: ['#FFD700', '#FFA500', '#FFF8DC', '#FF8C00', '#FFFFFF', '#FF00FF']
+            };
+
+            function randomInRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            // 1. 초기 중앙 대폭발 (5초간)
+            var duration = 5 * 1000;
+            var animationEnd = Date.now() + duration;
+            var burstInterval = setInterval(function() {
+                var timeLeft = animationEnd - Date.now();
+                if (timeLeft <= 0) {
+                    return clearInterval(burstInterval);
+                }
+                var particleCount = 100 * (timeLeft / duration);
+                confetti(Object.assign({}, defaults, { particleCount: particleCount, origin: { x: 0.5, y: 0.5 } }));
+            }, 250);
+
+            // 2. 밤하늘 불꽃놀이 (무한히 터짐)
+            // 종이 꽃가루(폭죽)가 아닌, 하늘에서 둥글게 터지는 실제 불꽃놀이 느낌
+            setInterval(function() {
+                confetti(Object.assign({}, defaults, { 
+                    particleCount: Math.floor(randomInRange(40, 80)), 
+                    spread: 360, 
+                    startVelocity: randomInRange(20, 40),
+                    // 화면 상단~중단 곳곳에서 랜덤하게 펑펑 터짐
+                    origin: { x: randomInRange(0.1, 0.9), y: randomInRange(0.1, 0.5) } 
+                }));
+            }, 600);
+        }
+
+        function goHome() {
+            window.location.href = window.location.pathname;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+    </script>
+</body>
+</html>
